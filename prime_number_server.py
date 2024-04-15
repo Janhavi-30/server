@@ -5,31 +5,34 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Prime number generator functions
+class PrimeGenerator:
+    def generate_primes(self, start, end):
+        pass
 
-def is_prime(n):
-    """Check if a number is prime."""
-    if n <= 1:
-        return False
-    if n <= 3:
-        return True
-    if n % 2 == 0 or n % 3 == 0:
-        return False
-    i = 5
-    while i * i <= n:
-        if n % i == 0 or n % (i + 2) == 0:
-            return False
-        i += 6
-    return True
-
-def generate_primes_range(start, end, strategy='naive'):
-    """Generate prime numbers within a given range."""
-    primes = []
-    if strategy == 'naive':
+class NaivePrimeGenerator(PrimeGenerator):
+    def generate_primes(self, start, end):
+        primes = []
         for num in range(max(2, start), end + 1):
-            if is_prime(num):
+            if self.is_prime(num):
                 primes.append(num)
-    elif strategy == 'sieve':
+        return primes
+    
+    def is_prime(self, n):
+        if n <= 1:
+            return False
+        if n <= 3:
+            return True
+        if n % 2 == 0 or n % 3 == 0:
+            return False
+        i = 5
+        while i * i <= n:
+            if n % i == 0 or n % (i + 2) == 0:
+                return False
+            i += 6
+        return True
+
+class SievePrimeGenerator(PrimeGenerator):
+    def generate_primes(self, start, end):
         sieve = [True] * (end + 1)
         p = 2
         while p * p <= end:
@@ -38,9 +41,7 @@ def generate_primes_range(start, end, strategy='naive'):
                     sieve[i] = False
             p += 1
         primes = [i for i in range(max(2, start), end + 1) if sieve[i]]
-    else:
-        raise ValueError("Invalid strategy")
-    return primes
+        return primes
 
 # Database setup
 conn = sqlite3.connect(':memory:')
@@ -56,7 +57,8 @@ def generate_primes():
     strategy = request.args.get('strategy', 'naive')
     
     start_time = time.time()
-    primes = generate_primes_range(start, end, strategy)
+    prime_generator = get_prime_generator(strategy)
+    primes = prime_generator.generate_primes(start, end)
     end_time = time.time()
     time_elapsed = end_time - start_time
     
@@ -73,6 +75,13 @@ def get_executions():
     executions = [{'timestamp': row[0], 'start': row[1], 'end': row[2], 'strategy': row[3], 'time_elapsed': row[4], 'num_primes': row[5]} for row in c.fetchall()]
     return jsonify(executions)
 
+def get_prime_generator(strategy):
+    if strategy == 'naive':
+        return NaivePrimeGenerator()
+    elif strategy == 'sieve':
+        return SievePrimeGenerator()
+    else:
+        raise ValueError("Invalid strategy")
 
 if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == 'server':
@@ -81,7 +90,8 @@ if __name__ == '__main__':
         start = int(sys.argv[1])
         end = int(sys.argv[2])
         strategy = sys.argv[3]
-        primes = generate_primes_range(start, end, strategy)
+        prime_generator = get_prime_generator(strategy)
+        primes = prime_generator.generate_primes(start, end)
         print(primes)
     else:
         print("Usage: python script.py server")
